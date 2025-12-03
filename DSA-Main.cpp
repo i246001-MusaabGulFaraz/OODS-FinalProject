@@ -206,14 +206,116 @@ class Bill {
     bool paid;
 public:
     Bill() {}
-    Bill(string bid, string rid, double st) : billID(bid), requestID(rid), subtotal(st) {
-        tax = subtotal * 0.10; // example 10%
-        total = subtotal + tax;
-        paid = false;
-    }
+	Bill(string bid, string rid, double st, int previousPaidBills = 0)
+	: billID(bid), requestID(rid), subtotal(st)
+	{
+		double discount = 0.0;
+		//check for discount
+		if (previousPaidBills >= 3) {
+			discount = subtotal * 0.10;
+			subtotal -= discount;
+		}
+		tax = subtotal * 0.10;
+		total = subtotal + tax;
+		paid = false;
+	}
+	//----------------------------------\\
+	//geters and setters
+    void markpaid(){
+        paid = true;
+	}
+	bool ispaid() const {
+		return paid;
+	}
+	double getsubtotal() const {
+		return subtotal;
+	}
+	double getax() const {
+		return tax;
+	}
+	double gettotal() const {
+		return total;
+	}
+	string getrequestid() const {
+		return requestID;
+	}
+	//----------------------------------\\
+	// Merge sort for total cost	
+	static void merge(vector<Bill>& arr, int left, int mid, int right){
+		int n1 = mid - left + 1;
+		int n2 = right - mid;
+
+		vector<Bill> L(n1), R(n2);
+
+		for(int i = 0; i < n1; i++){
+			L[i] = arr[left + i];
+		}
+		for(int j = 0; j < n2; j++){
+			R[j] = arr[mid + 1 + j];
+		}
+
+		int i = 0, j = 0, k = left;
+
+		while(i < n1 && j < n2){
+			if(L[i].gettotal() <= R[j].gettotal()){
+				arr[k++] = L[i++];
+			}
+			else{
+				arr[k++] = R[j++];
+			}
+		}
+		while(i < n1){
+			arr[k++] = L[i++];
+		}
+		while(j < n2){
+			arr[k++] = R[j++];
+		}
+	}
+	
+	static void sortByTotal(vector<Bill>& arr, int left, int right){
+		if(left < right){
+			int mid = left + (right - left) / 2;
+			sortByTotal(arr, left, mid);
+			sortByTotal(arr, mid + 1, right);
+			merge(arr, left, mid, right);
+		}
+	}
+	
+	//----------------------------------\\
+	//report genarator
+	static vector<Bill> generatereport(const unordered_map<string, Bill>& bills, const vector<ServiceRequest>& requests, const string& startDate, const string& endDate){
+		
+		vector<Bill> report;
+		unordered_map<string,string> requestDate;
+
+		for(const auto& req : requests){
+			requestDate[req.getID()] = req.getDate();
+		}
+
+		for(const auto& item : bills){
+			const Bill& b = item.second;
+
+			auto it = requestDate.find(b.getrequestid());
+			if(it != requestDate.end()){
+				const string& date = it->second;
+				if(date >= startDate && date <= endDate){
+					report.push_back(b);
+				}
+			}
+		}
+
+		if(!report.empty()){
+			sortByTotal(report, 0, report.size() - 1);
+		}
+
+		return report;
+	}
+
+	//serialization
     string serialize() const {
         return billID + "|" + requestID + "|" + to_string(subtotal) + "|" + to_string(tax) + "|" + to_string(total) + "|" + (paid ? "1":"0");
     }
+
     static Bill deserialize(const string& line) {
         stringstream ss(line);
         string bid, rid, st, tx, tot, pd;
@@ -222,6 +324,7 @@ public:
         return b;
     }
 };
+
 
 // --------------------------- Storage / Repositories ---------------------------
 class Repository {
@@ -569,3 +672,4 @@ int main() {
     cout << "Goodbye.\n";
     return 0;
 }
+
